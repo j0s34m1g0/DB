@@ -1,0 +1,243 @@
+from iqoptionapi.stable_api import IQ_Option
+import sys
+import numpy as np
+from talib.abstract import *
+import datetime
+
+divisa = ''
+dinero = 1
+
+API = IQ_Option('cognito802@gmail.com', '0lg4ch4v3z')
+API.connect()
+if API.check_connect():
+    print('conectado:OK')
+else:
+    print('Error de conexión')
+    input('\n\n Presione ENTER para salir')
+    sys.exit()
+
+
+def color(indice_vela):
+    if VELAS[indice_vela]['open'] - VELAS[indice_vela]['close'] > 0:
+        return f'rojo'
+    elif VELAS[indice_vela]['open'] - VELAS[indice_vela]['close'] < 0:
+        return f'verde'
+    else:
+        return f'blanco'
+
+
+def mecha_arriba(indice_vela):
+    if color(indice_vela) == 'rojo' or color(indice_vela) == 'blanco':
+        size = VELAS[indice_vela]['max'] - VELAS[indice_vela]['open']
+        return size
+    elif color(indice_vela) == 'verde' or color(indice_vela) == 'blanco':
+        size = VELAS[indice_vela]['max'] - VELAS[indice_vela]['close']
+        return size
+
+
+def mecha_abajo(indice_vela):
+    if color(indice_vela) == 'rojo' or color(indice_vela) == 'blanco':
+        size = VELAS[indice_vela]['close'] - VELAS[indice_vela]['min']
+        return size
+    elif color(indice_vela) == 'verde' or color(indice_vela) == 'blanco':
+        size = VELAS[indice_vela]['open'] - VELAS[indice_vela]['min']
+        return size
+
+
+def cuerpo(indice_vela):
+    if color(indice_vela) == 'rojo':
+        size = VELAS[indice_vela]['open'] - VELAS[indice_vela]['close']
+        return size
+    elif color(indice_vela) == 'verde':
+        size = VELAS[indice_vela]['close'] - VELAS[indice_vela]['open']
+        return size
+    else:
+        size = 0
+        return size
+
+
+while True:
+    f = open('divisas_activas.txt', 'r')
+    data = f.readlines()
+    f.close()
+    for i in data:
+        if divisa in i:
+            print('Bot activo en ' + str(divisa))
+            VELAS = API.get_candles(
+                divisa,
+                60,
+                17,
+                API.get_server_timestamp()
+            )
+            cci = {
+                'high': np.empty(17),
+                'low': np.empty(17),
+                'close': np.empty(17),
+            }
+            for x in range(0, 16):
+                cci['high'][x] = VELAS[x]['max']
+                cci['low'][x] = VELAS[x]['min']
+                cci['close'][x] = VELAS[x]['close']
+            r_cci = CCI(
+                cci['high'],
+                cci['low'],
+                cci['close'],
+                timeperiod=13
+            )
+            r_sma = SMA(
+                cci['close'],
+                timeperiod=13
+            )
+            seg = int(datetime.datetime.fromtimestamp(API.get_server_timestamp()).strftime('%S'))
+            if color(14) == 'verde' and \
+                    color(15) == 'verde' and \
+                    color(16) == 'verde':
+                if VELAS[14]['open'] < r_sma[-4]:
+                    if mecha_arriba(14) < cuerpo(14):
+                        if mecha_abajo(14) < cuerpo(14):
+                            if VELAS[15]['min'] > r_sma[-3]:
+                                if VELAS[16]['min'] > r_sma[-2]:
+                                    if r_cci[-1] >= 210:
+                                        if seg == 59:
+                                            while True:
+                                                check, id = API.buy(
+                                                    dinero,
+                                                    divisa,
+                                                    'put',
+                                                    0
+                                                )
+                                                if not check:
+                                                    break
+                                                else:
+                                                    resultado = API.check_win_v3(id)
+                                                    if resultado < 0:
+                                                        API.buy(
+                                                            dinero*2,
+                                                            divisa,
+                                                            'put',
+                                                            0
+                                                        )
+                                                        break
+                                                    if resultado == 0:
+                                                        API.buy(
+                                                            dinero*2,
+                                                            divisa,
+                                                            'put',
+                                                            0
+                                                        )
+                                                        break
+                                                    if resultado > 0:
+                                                        break
+            elif color(15) == 'verde' and \
+                    color(16) == 'verde':
+                if VELAS[15]['open'] < r_sma[-3]:
+                    if mecha_arriba(15) < cuerpo(15):
+                        if mecha_abajo(15) < cuerpo(15):
+                            if VELAS[16]['min'] > r_sma[-2]:
+                                if r_cci[-1] >= 210:
+                                    if seg == 59:
+                                        while True:
+                                            check, id = API.buy(
+                                                dinero,
+                                                divisa,
+                                                'put',
+                                                0
+                                            )
+                                            if not check:
+                                                break
+                                            else:
+                                                resultado = API.check_win_v3(id)
+                                                if resultado < 0:
+                                                    API.buy(
+                                                        dinero*2,
+                                                        divisa,
+                                                        'put',
+                                                        0
+                                                    )
+                                                    break
+                                                if resultado == 0:
+                                                    API.buy(
+                                                        dinero*2,
+                                                        divisa,
+                                                        'put',
+                                                        0
+                                                    )
+                                                    break
+                                                if resultado > 0:
+                                                    break
+            elif color(14) == 'rojo' and \
+                    color(15) == 'rojo' and \
+                    color(16) == 'rojo':
+                if VELAS[14]['open'] > r_sma[-4]:
+                    if mecha_arriba(14) < cuerpo(14):
+                        if mecha_abajo(14) < cuerpo(14):
+                            if VELAS[15]['max'] < r_sma[-3]:
+                                if VELAS[16]['max'] < r_sma[-2]:
+                                    if r_cci[-1] <= -210:
+                                        if seg == 59:
+                                            while True:
+                                                check, id = API.buy(
+                                                    dinero,
+                                                    divisa,
+                                                    'call',
+                                                    0
+                                                )
+                                                if not check:
+                                                    break
+                                                else:
+                                                    resultado = API.check_win_v3(id)
+                                                    if resultado < 0:
+                                                        API.buy(
+                                                            dinero*2,
+                                                            divisa,
+                                                            'call',
+                                                            0
+                                                        )
+                                                        break
+                                                    if resultado == 0:
+                                                        API.buy(
+                                                            dinero*2,
+                                                            divisa,
+                                                            'call',
+                                                            0
+                                                        )
+                                                        break
+                                                    if resultado > 0:
+                                                        break
+            elif color(15) == 'rojo' and \
+                    color(16) == 'rojo':
+                if VELAS[15]['open'] > r_sma[-3]:
+                    if mecha_arriba(15) < cuerpo(15):
+                        if mecha_abajo(15) < cuerpo(15):
+                            if VELAS[16]['max'] < r_sma[-2]:
+                                if r_cci[-1] <= -210:
+                                    if seg == 59:
+                                        while True:
+                                            check, id = API.buy(
+                                                dinero,
+                                                divisa,
+                                                'call',
+                                                0
+                                            )
+                                            if not check:
+                                                break
+                                            else:
+                                                resultado = API.check_win_v3(id)
+                                                if resultado < 0:
+                                                    API.buy(
+                                                        dinero*2,
+                                                        divisa,
+                                                        'call',
+                                                        0
+                                                    )
+                                                    break
+                                                if resultado == 0:
+                                                    API.buy(
+                                                        dinero*2,
+                                                        divisa,
+                                                        'call',
+                                                        0
+                                                    )
+                                                    break
+                                                if resultado > 0:
+                                                    break
